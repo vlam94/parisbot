@@ -76,5 +76,6 @@ desktop.ini
 .ipynb_checkpoints/
 
 # Misc
+*response.json
 *.swp
 *~ 
