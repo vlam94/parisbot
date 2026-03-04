@@ -79,3 +79,5 @@ desktop.ini
 *response.json
 *.swp
 *~ 
+gitignore/
+.github/
