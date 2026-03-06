@@ -1,0 +1,52 @@
+{
+  "name": "webserver",
+  "version": "1.0.0",
+  "type": "webserver",
+  "engine": "superset",
+  "image": "apache/superset:3.0.0",
+  "container_name": "superset-webserver",
+  "description": "Superset webserver for interactive data visualization and dashboards",
+  "ports": {
+    "internal": 8088,
+    "external": 8088
+  },
+  "environment": {
+    "SUPERSET_ENV": "production",
+    "SUPERSET_LOAD_EXAMPLES": "no",
+    "DATABASE_URL": "postgresql://superset:superset_secure_pass_123@metadata:5432/superset_metadata",
+    "REDIS_URL": "redis://cache:6379/0",
+    "SECRET_KEY": "your-secret-key-change-in-production",
+    "FLASK_ENV": "production"
+  },
+  "volumes": {
+    "home": "/app/superset_home"
+  },
+  "resources": {
+    "cpu_limit": "1.5",
+    "memory_limit": "2G",
+    "cpu_reservation": "0.75",
+    "memory_reservation": "1G"
+  },
+  "healthcheck": {
+    "test": "curl -f http://localhost:8088/health || exit 1",
+    "interval": 30,
+    "timeout": 10,
+    "retries": 5
+  },
+  "depends_on": {
+    "metadata": "service_healthy",
+    "cache": "service_healthy"
+  },
+  "network": {
+    "name": "parisbot_network",
+    "driver": "bridge"
+  },
+  "logging": {
+    "driver": "json-file",
+    "options": {
+      "max-size": "10m",
+      "max-file": "3"
+    }
+  },
+  "restart_policy": "unless-stopped"
+}

@@ -1,0 +1,20 @@
+[
+	{
+		"name": "database"
+	},
+	{
+		"name": "messenger"
+	},
+	{
+		"name": "worker"
+	},
+	{
+		"name": "scheduler"
+	},
+    {
+		"name": "monitor"
+	},
+	{
+		"name": "server"
+	}
+]

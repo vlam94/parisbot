@@ -1,0 +1,58 @@
+{
+  "name": "datawarehouse",
+  "version": "1.0.0",
+  "type": "database",
+  "engine": "postgres",
+  "image": "postgres:18-alpine",
+  "container_name": "parisbot-datawarehouse",
+  "description": "PostgreSQL 18 datawarehouse service for analytics and data storage",
+  "ports": {
+    "internal": 5432,
+    "external": 5433
+  },
+  "environment": {
+    "POSTGRES_USER": "datawarehouse",
+    "POSTGRES_PASSWORD": "datawarehouse_secure_pass_123",
+    "POSTGRES_DB": "datawarehouse",
+    "POSTGRES_INITDB_ARGS": "-c shared_preload_libraries=pg_stat_statements"
+  },
+  "volumes": {
+    "data": "/var/lib/postgresql/data",
+    "config": "./conf:/etc/postgresql",
+    "scripts": "./:/docker-entrypoint-initdb.d"
+  },
+  "resources": {
+    "cpu_limit": "1",
+    "memory_limit": "1.5G",
+    "cpu_reservation": "0.5",
+    "memory_reservation": "768M"
+  },
+  "healthcheck": {
+    "test": "pg_isready -U datawarehouse -d datawarehouse",
+    "interval": 10,
+    "timeout": 5,
+    "retries": 5
+  },
+  "network": {
+    "name": "parisbot_network",
+    "driver": "bridge"
+  },
+  "logging": {
+    "driver": "json-file",
+    "options": {
+      "max-size": "10m",
+      "max-file": "3"
+    }
+  },
+  "restart_policy": "unless-stopped",
+  "post_deployment": {
+    "script": "post_deploy.sh",
+    "description": "Creates schemas, extensions, and metadata tables"
+  },
+  "schemas": {
+    "raw_data": "Raw data ingestion layer",
+    "staging": "Data cleaning and transformation",
+    "analytics": "Final analytics-ready tables",
+    "metadata": "Metadata and ETL tracking"
+  }
+}

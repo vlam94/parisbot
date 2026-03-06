@@ -1,0 +1,48 @@
+{
+  "name": "monitor",
+  "version": "1.0.0",
+  "type": "monitoring",
+  "engine": "prometheus",
+  "image": "parisbot-monitor:latest",
+  "container_name": "parisbot-monitor",
+  "description": "Monitoring and metrics service for ParisBot data pipeline",
+  "ports": {
+    "internal": 9090,
+    "external": 9090
+  },
+  "environment": {
+    "DATABASE_URL": "postgresql://parisbot:parisbot_secure_123@database:5432/parisbot",
+    "REDIS_URL": "redis://messenger:6379/0"
+  },
+  "volumes": {
+    "metrics": "/app/metrics"
+  },
+  "resources": {
+    "cpu_limit": "0.5",
+    "memory_limit": "512M",
+    "cpu_reservation": "0.25",
+    "memory_reservation": "256M"
+  },
+  "healthcheck": {
+    "test": "curl -f http://localhost:9090/metrics || exit 1",
+    "interval": 30,
+    "timeout": 10,
+    "retries": 3
+  },
+  "depends_on": {
+    "database": "service_healthy",
+    "messenger": "service_healthy"
+  },
+  "network": {
+    "name": "parisbot_network",
+    "driver": "bridge"
+  },
+  "logging": {
+    "driver": "json-file",
+    "options": {
+      "max-size": "10m",
+      "max-file": "3"
+    }
+  },
+  "restart_policy": "unless-stopped"
+}

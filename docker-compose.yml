@@ -1,22 +1,31 @@
 version: '3.9'
 
 services:
-  postgres:
-    image: postgres:18-alpine
-    container_name: parisbot-postgres
+  # ============================================
+  # Core Infrastructure Services
+  # ============================================
+  
+  # Data Pipeline Database Module
+  database:
+    build:
+      context: ./data-pipeline/data-pipeline-infrastructure/src/main/database
+      dockerfile: Dockerfile
+    container_name: parisbot-database
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-airflow}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-airflow}
-      POSTGRES_DB: ${POSTGRES_DB:-airflow}
+      POSTGRES_USER: ${POSTGRES_USER:-parisbot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-parisbot_secure_123}
+      POSTGRES_DB: ${POSTGRES_DB:-parisbot}
+      POSTGRES_INITDB_ARGS: "-c shared_preload_libraries=pg_stat_statements"
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./data-pipeline/data-pipeline-infrastructure/src/main/database/conf/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./data-pipeline/data-pipeline-infrastructure/src/main/database/conf/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     networks:
       - parisbot_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-airflow}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-parisbot} -d ${POSTGRES_DB:-parisbot}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -29,19 +38,190 @@ services:
           cpus: '0.25'
           memory: 256M
 
+  # Messenger Module (Redis)
+  messenger:
+    build:
+      context: ./data-pipeline/data-pipeline-infrastructure/src/main/messenger
+      dockerfile: Dockerfile
+    container_name: parisbot-messenger
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - parisbot_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+
+  # ============================================
+  # Data Pipeline Services
+  # ============================================
+
+  # Worker Module (Celery Worker)
+  worker:
+    build:
+      context: ./data-pipeline/data-pipeline-infrastructure/src/main/worker
+      dockerfile: Dockerfile
+    container_name: parisbot-worker
+    environment:
+      CELERY_BROKER_URL: redis://messenger:6379/0
+      CELERY_RESULT_BACKEND: redis://messenger:6379/1
+      DATABASE_URL: postgresql://parisbot:parisbot_secure_123@database:5432/parisbot
+    depends_on:
+      database:
+        condition: service_healthy
+      messenger:
+        condition: service_healthy
+    volumes:
+      - ./data-pipeline/data-pipeline-infrastructure/src/main/worker:/app
+    networks:
+      - parisbot_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Scheduler Module (Celery Beat)
+  scheduler:
+    build:
+      context: ./data-pipeline/data-pipeline-infrastructure/src/main/scheduler
+      dockerfile: Dockerfile
+    container_name: parisbot-scheduler
+    environment:
+      CELERY_BROKER_URL: redis://messenger:6379/0
+      CELERY_RESULT_BACKEND: redis://messenger:6379/1
+      DATABASE_URL: postgresql://parisbot:parisbot_secure_123@database:5432/parisbot
+    depends_on:
+      database:
+        condition: service_healthy
+      messenger:
+        condition: service_healthy
+    volumes:
+      - ./data-pipeline/data-pipeline-infrastructure/src/main/scheduler:/app
+    networks:
+      - parisbot_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Monitor Module (Metrics & Monitoring)
+  monitor:
+    build:
+      context: ./data-pipeline/data-pipeline-infrastructure/src/main/monitor
+      dockerfile: Dockerfile
+    container_name: parisbot-monitor
+    ports:
+      - "9090:9090"
+    environment:
+      DATABASE_URL: postgresql://parisbot:parisbot_secure_123@database:5432/parisbot
+      REDIS_URL: redis://messenger:6379/0
+    depends_on:
+      database:
+        condition: service_healthy
+      messenger:
+        condition: service_healthy
+    volumes:
+      - ./data-pipeline/data-pipeline-infrastructure/src/main/monitor:/app
+      - monitor_data:/app/metrics
+    networks:
+      - parisbot_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Server Module (API Server)
+  server:
+    build:
+      context: ./data-pipeline/data-pipeline-infrastructure/src/main/server
+      dockerfile: Dockerfile
+    container_name: parisbot-server
+    ports:
+      - "8000:8080"
+    environment:
+      DATABASE_URL: postgresql://parisbot:parisbot_secure_123@database:5432/parisbot
+      REDIS_URL: redis://messenger:6379/0
+      CELERY_BROKER_URL: redis://messenger:6379/0
+    depends_on:
+      database:
+        condition: service_healthy
+      messenger:
+        condition: service_healthy
+    volumes:
+      - ./data-pipeline/data-pipeline-infrastructure/src/main/server:/app
+    networks:
+      - parisbot_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # ============================================
+  # Legacy Services (Airflow & Superset)
+  # ============================================
+
   airflow-webserver:
     image: apache/airflow:3.1.0
     container_name: parisbot-airflow-webserver
     environment:
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/${POSTGRES_DB:-airflow}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@database:5432/${POSTGRES_DB:-airflow}
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-Iv8zVP9GQ20thIcnCZHOeVTgLw5NNo81HLvQUUbz4vk=}
       AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
       AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'True'
     depends_on:
-      postgres:
+      database:
         condition: service_healthy
     ports:
       - "8080:8080"
@@ -78,12 +258,12 @@ services:
     environment:
       AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/${POSTGRES_DB:-airflow}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@database:5432/${POSTGRES_DB:-airflow}
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-Iv8zVP9GQ20thIcnCZHOeVTgLw5NNo81HLvQUUbz4vk=}
       AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
       AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
     depends_on:
-      postgres:
+      database:
         condition: service_healthy
       airflow-webserver:
         condition: service_healthy
@@ -109,19 +289,18 @@ services:
     environment:
       SUPERSET_ENV: production
       SUPERSET_LOAD_EXAMPLES: 'no'
-      DATABASE_URL: postgresql://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres:5432/superset
-      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@database:5432/superset
+      REDIS_URL: redis://messenger:6379/0
       SECRET_KEY: ${SUPERSET_SECRET_KEY:-your-secret-key-change-me-in-production}
     depends_on:
-      postgres:
+      database:
         condition: service_healthy
-      redis:
+      messenger:
         condition: service_healthy
     ports:
       - "8088:8088"
     volumes:
       - superset_data:/app/superset_home
-      - ./scripts/superset-init.py:/app/superset_init.py:ro
     networks:
       - parisbot_network
     healthcheck:
@@ -147,37 +326,16 @@ services:
       gunicorn -b 0.0.0.0:8088 --workers 2 --worker-class sync --timeout 120 'superset.app:create_app()'
       "
 
-  redis:
-    image: redis:7-alpine
-    container_name: parisbot-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - parisbot_network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: '0.25'
-          memory: 256M
-        reservations:
-          cpus: '0.1'
-          memory: 128M
-
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local
   airflow_plugins:
     driver: local
   superset_data:
     driver: local
-  redis_data:
+  monitor_data:
     driver: local
 
 networks:

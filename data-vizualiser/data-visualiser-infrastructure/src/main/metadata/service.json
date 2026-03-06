@@ -1,0 +1,45 @@
+{
+  "name": "metadata",
+  "version": "1.0.0",
+  "type": "database",
+  "engine": "postgres",
+  "image": "postgres:18-alpine",
+  "container_name": "superset-metadata",
+  "description": "PostgreSQL metadata database for Superset (configurations, dashboards, datasets)",
+  "ports": {
+    "internal": 5432,
+    "external": null
+  },
+  "environment": {
+    "POSTGRES_USER": "superset",
+    "POSTGRES_PASSWORD": "superset_secure_pass_123",
+    "POSTGRES_DB": "superset_metadata"
+  },
+  "volumes": {
+    "data": "/var/lib/postgresql/data"
+  },
+  "resources": {
+    "cpu_limit": "0.5",
+    "memory_limit": "512M",
+    "cpu_reservation": "0.25",
+    "memory_reservation": "256M"
+  },
+  "healthcheck": {
+    "test": "pg_isready -U superset -d superset_metadata",
+    "interval": 10,
+    "timeout": 5,
+    "retries": 5
+  },
+  "network": {
+    "name": "parisbot_network",
+    "driver": "bridge"
+  },
+  "logging": {
+    "driver": "json-file",
+    "options": {
+      "max-size": "10m",
+      "max-file": "3"
+    }
+  },
+  "restart_policy": "unless-stopped"
+}

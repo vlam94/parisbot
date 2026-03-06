@@ -1,0 +1,41 @@
+{
+  "name": "cache",
+  "version": "1.0.0",
+  "type": "cache",
+  "engine": "redis",
+  "image": "redis:7-alpine",
+  "container_name": "superset-cache",
+  "description": "Redis cache and session store for Superset",
+  "ports": {
+    "internal": 6379,
+    "external": null
+  },
+  "environment": {},
+  "volumes": {
+    "data": "/data"
+  },
+  "resources": {
+    "cpu_limit": "0.25",
+    "memory_limit": "256M",
+    "cpu_reservation": "0.1",
+    "memory_reservation": "128M"
+  },
+  "healthcheck": {
+    "test": "redis-cli ping",
+    "interval": 10,
+    "timeout": 5,
+    "retries": 5
+  },
+  "network": {
+    "name": "parisbot_network",
+    "driver": "bridge"
+  },
+  "logging": {
+    "driver": "json-file",
+    "options": {
+      "max-size": "10m",
+      "max-file": "3"
+    }
+  },
+  "restart_policy": "unless-stopped"
+}

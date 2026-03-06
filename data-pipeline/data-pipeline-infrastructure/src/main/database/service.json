@@ -1,0 +1,47 @@
+{
+  "name": "database",
+  "version": "1.0.0",
+  "type": "database",
+  "engine": "postgres",
+  "image": "postgres:18-alpine",
+  "container_name": "parisbot-database",
+  "description": "PostgreSQL 18 database service for ParisBot data pipeline",
+  "ports": {
+    "internal": 5432,
+    "external": 5432
+  },
+  "environment": {
+    "POSTGRES_USER": "parisbot",
+    "POSTGRES_PASSWORD": "parisbot_secure_123",
+    "POSTGRES_DB": "parisbot",
+    "POSTGRES_INITDB_ARGS": "-c shared_preload_libraries=pg_stat_statements"
+  },
+  "volumes": {
+    "data": "/var/lib/postgresql/data",
+    "config": "./conf:/etc/postgresql"
+  },
+  "resources": {
+    "cpu_limit": "0.5",
+    "memory_limit": "512M",
+    "cpu_reservation": "0.25",
+    "memory_reservation": "256M"
+  },
+  "healthcheck": {
+    "test": "pg_isready -U parisbot -d parisbot",
+    "interval": 10,
+    "timeout": 5,
+    "retries": 5
+  },
+  "network": {
+    "name": "parisbot_network",
+    "driver": "bridge"
+  },
+  "logging": {
+    "driver": "json-file",
+    "options": {
+      "max-size": "10m",
+      "max-file": "3"
+    }
+  },
+  "restart_policy": "unless-stopped"
+}

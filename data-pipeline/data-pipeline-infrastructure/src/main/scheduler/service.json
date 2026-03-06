@@ -1,0 +1,47 @@
+{
+  "name": "scheduler",
+  "version": "1.0.0",
+  "type": "scheduler",
+  "engine": "celery-beat",
+  "image": "parisbot-scheduler:latest",
+  "container_name": "parisbot-scheduler",
+  "description": "Celery Beat scheduler service for ParisBot periodic task scheduling",
+  "ports": {
+    "internal": 8001,
+    "external": null
+  },
+  "environment": {
+    "CELERY_BROKER_URL": "redis://messenger:6379/0",
+    "CELERY_RESULT_BACKEND": "redis://messenger:6379/1",
+    "DATABASE_URL": "postgresql://parisbot:parisbot_secure_123@database:5432/parisbot"
+  },
+  "volumes": {},
+  "resources": {
+    "cpu_limit": "0.5",
+    "memory_limit": "512M",
+    "cpu_reservation": "0.25",
+    "memory_reservation": "256M"
+  },
+  "healthcheck": {
+    "test": "curl -f http://localhost:8001/health || exit 1",
+    "interval": 30,
+    "timeout": 10,
+    "retries": 3
+  },
+  "depends_on": {
+    "database": "service_healthy",
+    "messenger": "service_healthy"
+  },
+  "network": {
+    "name": "parisbot_network",
+    "driver": "bridge"
+  },
+  "logging": {
+    "driver": "json-file",
+    "options": {
+      "max-size": "10m",
+      "max-file": "3"
+    }
+  },
+  "restart_policy": "unless-stopped"
+}

@@ -1,0 +1,48 @@
+{
+  "name": "worker",
+  "version": "1.0.0",
+  "type": "worker",
+  "engine": "celery",
+  "image": "apache/superset:3.0.0",
+  "container_name": "superset-worker",
+  "description": "Celery worker for Superset asynchronous tasks (chart rendering, exports)",
+  "ports": {
+    "internal": 5555,
+    "external": null
+  },
+  "environment": {
+    "DATABASE_URL": "postgresql://superset:superset_secure_pass_123@metadata:5432/superset_metadata",
+    "REDIS_URL": "redis://cache:6379/0",
+    "CELERY_BROKER_URL": "redis://cache:6379/1",
+    "CELERY_RESULT_BACKEND": "redis://cache:6379/2"
+  },
+  "volumes": {},
+  "resources": {
+    "cpu_limit": "1",
+    "memory_limit": "1G",
+    "cpu_reservation": "0.5",
+    "memory_reservation": "512M"
+  },
+  "healthcheck": {
+    "test": "curl -f http://localhost:5555/ || exit 1",
+    "interval": 30,
+    "timeout": 10,
+    "retries": 3
+  },
+  "depends_on": {
+    "metadata": "service_healthy",
+    "cache": "service_healthy"
+  },
+  "network": {
+    "name": "parisbot_network",
+    "driver": "bridge"
+  },
+  "logging": {
+    "driver": "json-file",
+    "options": {
+      "max-size": "10m",
+      "max-file": "3"
+    }
+  },
+  "restart_policy": "unless-stopped"
+}

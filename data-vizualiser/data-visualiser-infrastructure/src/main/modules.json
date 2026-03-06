@@ -1,0 +1,17 @@
+[
+  {
+    "name": "metadata"
+  },
+  {
+    "name": "webserver"
+  },
+  {
+    "name": "cache"
+  },
+  {
+    "name": "worker"
+  },
+  {
+    "name": "query-engine"
+  }
+]

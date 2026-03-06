@@ -1,0 +1,47 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "type": "api",
+  "engine": "fastapi",
+  "image": "parisbot-server:latest",
+  "container_name": "parisbot-server",
+  "description": "FastAPI server for ParisBot data pipeline API",
+  "ports": {
+    "internal": 8080,
+    "external": 8080
+  },
+  "environment": {
+    "DATABASE_URL": "postgresql://parisbot:parisbot_secure_123@database:5432/parisbot",
+    "REDIS_URL": "redis://messenger:6379/0",
+    "CELERY_BROKER_URL": "redis://messenger:6379/0"
+  },
+  "volumes": {},
+  "resources": {
+    "cpu_limit": "1",
+    "memory_limit": "1G",
+    "cpu_reservation": "0.5",
+    "memory_reservation": "512M"
+  },
+  "healthcheck": {
+    "test": "curl -f http://localhost:8080/health || exit 1",
+    "interval": 30,
+    "timeout": 10,
+    "retries": 3
+  },
+  "depends_on": {
+    "database": "service_healthy",
+    "messenger": "service_healthy"
+  },
+  "network": {
+    "name": "parisbot_network",
+    "driver": "bridge"
+  },
+  "logging": {
+    "driver": "json-file",
+    "options": {
+      "max-size": "10m",
+      "max-file": "3"
+    }
+  },
+  "restart_policy": "unless-stopped"
+}

@@ -1,0 +1,47 @@
+{
+  "name": "worker",
+  "version": "1.0.0",
+  "type": "worker",
+  "engine": "celery",
+  "image": "parisbot-worker:latest",
+  "container_name": "parisbot-worker",
+  "description": "Celery worker service for ParisBot data pipeline task execution",
+  "ports": {
+    "internal": 8000,
+    "external": null
+  },
+  "environment": {
+    "CELERY_BROKER_URL": "redis://messenger:6379/0",
+    "CELERY_RESULT_BACKEND": "redis://messenger:6379/1",
+    "DATABASE_URL": "postgresql://parisbot:parisbot_secure_123@database:5432/parisbot"
+  },
+  "volumes": {},
+  "resources": {
+    "cpu_limit": "1",
+    "memory_limit": "1G",
+    "cpu_reservation": "0.5",
+    "memory_reservation": "512M"
+  },
+  "healthcheck": {
+    "test": "curl -f http://localhost:8000/health || exit 1",
+    "interval": 30,
+    "timeout": 10,
+    "retries": 3
+  },
+  "depends_on": {
+    "database": "service_healthy",
+    "messenger": "service_healthy"
+  },
+  "network": {
+    "name": "parisbot_network",
+    "driver": "bridge"
+  },
+  "logging": {
+    "driver": "json-file",
+    "options": {
+      "max-size": "10m",
+      "max-file": "3"
+    }
+  },
+  "restart_policy": "unless-stopped"
+}
