@@ -1,0 +1,243 @@
+version: '3.9'
+
+services:
+  # ============================================
+  # Database Services
+  # ============================================
+  
+  # Airflow Database (PostgreSQL)
+  airflow-db:
+    image: postgres:18-alpine
+    container_name: dataops-airflow-db
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER:-airflow}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:-airflow_pass}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME:-airflow}
+    ports:
+      - "5432:5432"
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
+      - ./database/infrastructure/src/main/resources/conf/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+    networks:
+      - dataops-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_DB_USER:-airflow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.8'
+          memory: 1.5G
+        reservations:
+          cpus: '0.4'
+          memory: 750M
+
+  # Superset Database (PostgreSQL)
+  superset-db:
+    image: postgres:18-alpine
+    container_name: dataops-superset-db
+    environment:
+      POSTGRES_USER: ${SUPERSET_DB_USER:-superset}
+      POSTGRES_PASSWORD: ${SUPERSET_DB_PASSWORD:-superset_pass}
+      POSTGRES_DB: ${SUPERSET_DB_NAME:-superset}
+    ports:
+      - "5433:5432"
+    volumes:
+      - superset_db_data:/var/lib/postgresql/data
+      - ./database/infrastructure/src/main/resources/conf/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+    networks:
+      - dataops-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SUPERSET_DB_USER:-superset}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.8'
+          memory: 1.5G
+        reservations:
+          cpus: '0.4'
+          memory: 750M
+
+  # Redis Cache and Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: dataops-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - dataops-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 1G
+        reservations:
+          cpus: '0.2'
+          memory: 512M
+
+  # ============================================
+  # Data Pipeline Services (Airflow)
+  # ============================================
+
+  airflow-webserver:
+    build:
+      context: ./data-pipeline/infrastructure/src/main/resources/modules
+      dockerfile: Dockerfile
+    container_name: dataops-airflow-webserver
+    environment:
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:-airflow_pass}@airflow-db:5432/${AIRFLOW_DB_NAME:-airflow}
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+      AIRFLOW__CELERY__RESULT_BACKEND: redis://redis:6379/1
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+      AIRFLOW_FERNET_KEY: ${AIRFLOW_FERNET_KEY:-Iv8zVP9GQ20thIcnCZHOeVTgLw5NNo81HLvQUUbz4vk=}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data-pipeline/src/main/python/dags:/opt/airflow/dags
+      - ./data-pipeline/src/main/python/operators:/opt/airflow/plugins
+      - ./data-pipeline/src/main/python/utils:/opt/airflow/utils
+    networks:
+      - dataops-net
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    entrypoint: >
+      bash -c "
+      airflow db upgrade &&
+      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@airflow.local || true &&
+      airflow webserver
+      "
+
+  airflow-scheduler:
+    build:
+      context: ./data-pipeline/infrastructure/src/main/resources/modules
+      dockerfile: Dockerfile
+    container_name: dataops-airflow-scheduler
+    environment:
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:-airflow_pass}@airflow-db:5432/${AIRFLOW_DB_NAME:-airflow}
+      AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+      AIRFLOW__CELERY__RESULT_BACKEND: redis://redis:6379/1
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+      AIRFLOW_FERNET_KEY: ${AIRFLOW_FERNET_KEY:-Iv8zVP9GQ20thIcnCZHOeVTgLw5NNo81HLvQUUbz4vk=}
+    volumes:
+      - ./data-pipeline/src/main/python/dags:/opt/airflow/dags
+      - ./data-pipeline/src/main/python/operators:/opt/airflow/plugins
+      - ./data-pipeline/src/main/python/utils:/opt/airflow/utils
+    networks:
+      - dataops-net
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.6'
+          memory: 1.2G
+        reservations:
+          cpus: '0.3'
+          memory: 600M
+    command: scheduler
+
+  # ============================================
+  # Data Visualization Services (Superset)
+  # ============================================
+
+  superset:
+    build:
+      context: ./data-vizualiser/infrastructure/src/main/resources
+      dockerfile: modules/Dockerfile
+    container_name: dataops-superset
+    environment:
+      SUPERSET_ENV: production
+      SUPERSET_LOAD_EXAMPLES: 'no'
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-superset_secret_key_change_me}
+      SUPERSET_DATABASE_URI: postgresql://${SUPERSET_DB_USER:-superset}:${SUPERSET_DB_PASSWORD:-superset_pass}@superset-db:5432/${SUPERSET_DB_NAME:-superset}
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      REDIS_DB: '0'
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./data-vizualiser/infrastructure/src/main/resources/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - superset_db_data:/app/superset_home
+    networks:
+      - dataops-net
+    depends_on:
+      superset-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    entrypoint: >
+      bash -c "
+      superset db upgrade &&
+      superset fab create-admin --username admin --password admin --firstname Admin --lastname User --email admin@superset.local || true &&
+      superset init &&
+      gunicorn -b 0.0.0.0:8088 --workers 2 --worker-class sync --timeout 120 'superset.app:create_app()'
+      "
+
+# ============================================
+# Volumes
+# ============================================
+volumes:
+  airflow_db_data:
+    driver: local
+  superset_db_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# ============================================
+# Networks
+# ============================================
+networks:
+  dataops-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

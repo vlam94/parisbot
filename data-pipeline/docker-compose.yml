@@ -1,0 +1,169 @@
+version: '3.9'
+
+services:
+  airflow-database:
+    build:
+      context: ./infrastructure/src/main/resources/database
+      dockerfile: Dockerfile
+    container_name: airflow-database
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_DB_USER} -d ${AIRFLOW_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - parisbot-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.6'
+          memory: 1.0G
+        reservations:
+          cpus: '0.3'
+          memory: 512M
+
+  airflow-messenger:
+    build:
+      context: ./infrastructure/src/main/resources/messenger
+      dockerfile: Dockerfile
+    container_name: airflow-messenger
+    ports:
+      - "6379:6379"
+    volumes:
+      - airflow_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - parisbot-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 400M
+        reservations:
+          cpus: '0.1'
+          memory: 200M
+
+  airflow-scheduler:
+    build:
+      context: ./infrastructure/src/main/resources/scheduler
+      dockerfile: Dockerfile
+    container_name: airflow-scheduler
+    environment:
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow-database:5432/${AIRFLOW_DB_NAME}
+      AIRFLOW__CELERY__BROKER_URL: redis://airflow-messenger:6379/0
+      AIRFLOW__CELERY__RESULT_BACKEND: redis://airflow-messenger:6379/1
+      AIRFLOW_FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+    volumes:
+      - airflow_logs:/opt/airflow/logs
+      - ./src/main/python/dags:/opt/airflow/dags:ro
+    depends_on:
+      airflow-database:
+        condition: service_healthy
+      airflow-messenger:
+        condition: service_healthy
+    networks:
+      - parisbot-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 300M
+        reservations:
+          cpus: '0.1'
+          memory: 150M
+
+  airflow-worker:
+    build:
+      context: ./infrastructure/src/main/resources/worker
+      dockerfile: Dockerfile
+    container_name: airflow-worker
+    environment:
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow-database:5432/${AIRFLOW_DB_NAME}
+      AIRFLOW__CELERY__BROKER_URL: redis://airflow-messenger:6379/0
+      AIRFLOW__CELERY__RESULT_BACKEND: redis://airflow-messenger:6379/1
+      AIRFLOW_FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+    volumes:
+      - airflow_logs:/opt/airflow/logs
+      - ./src/main/python/dags:/opt/airflow/dags:ro
+    depends_on:
+      airflow-database:
+        condition: service_healthy
+      airflow-messenger:
+        condition: service_healthy
+    networks:
+      - parisbot-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 600M
+        reservations:
+          cpus: '0.15'
+          memory: 300M
+
+  airflow-webserver:
+    build:
+      context: ./infrastructure/src/main/resources/server
+      dockerfile: Dockerfile
+    container_name: airflow-webserver
+    environment:
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow-database:5432/${AIRFLOW_DB_NAME}
+      AIRFLOW__CELERY__BROKER_URL: redis://airflow-messenger:6379/0
+      AIRFLOW__CELERY__RESULT_BACKEND: redis://airflow-messenger:6379/1
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+      AIRFLOW_FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+    ports:
+      - "8080:8080"
+    volumes:
+      - airflow_logs:/opt/airflow/logs
+      - ./src/main/python/dags:/opt/airflow/dags:ro
+    depends_on:
+      airflow-database:
+        condition: service_healthy
+      airflow-messenger:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - parisbot-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.6'
+          memory: 1.0G
+        reservations:
+          cpus: '0.3'
+          memory: 500M
+
+volumes:
+  airflow_db_data:
+  airflow_redis_data:
+  airflow_logs:
+
+networks:
+  parisbot-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

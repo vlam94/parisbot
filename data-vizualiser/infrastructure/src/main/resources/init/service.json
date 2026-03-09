@@ -1,0 +1,32 @@
+{
+  "name": "superset-init",
+  "version": "6.0.0",
+  "type": "initialization",
+  "engine": "superset",
+  "image": "apache/superset:6.0-python3.11",
+  "description": "Superset database initialization and setup",
+  "ports": [],
+  "environment": {
+    "SUPERSET_CONFIG_PATH": "/app/pythonpath/superset_config.py",
+    "SUPERSET_DATABASE_URI": "postgresql://superset:${SUPERSET_DB_PASSWORD}@superset-database:5433/superset"
+  },
+  "volumes": [],
+  "resources": {
+    "limits": {
+      "cpus": "0.2",
+      "memory": "300MB"
+    },
+    "reservations": {
+      "cpus": "0.1",
+      "memory": "150MB"
+    }
+  },
+  "healthcheck": {
+    "test": ["CMD-SHELL", "exit 0"],
+    "interval": "30s",
+    "timeout": "10s",
+    "retries": 1
+  },
+  "network": "parisbot-net",
+  "depends_on": ["superset-database"]
+}

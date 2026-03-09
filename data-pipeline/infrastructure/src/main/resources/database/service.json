@@ -1,0 +1,36 @@
+{
+  "name": "airflow-database",
+  "version": "18.0.0",
+  "type": "database",
+  "engine": "postgresql",
+  "image": "postgres:18-alpine",
+  "description": "PostgreSQL metadata database for Airflow",
+  "ports": [5432],
+  "environment": {
+    "POSTGRES_USER": "airflow",
+    "POSTGRES_PASSWORD": "${AIRFLOW_DB_PASSWORD}",
+    "POSTGRES_DB": "airflow",
+    "POSTGRES_INITDB_ARGS": "-c shared_buffers=256MB"
+  },
+  "volumes": [
+    "airflow_db_data:/var/lib/postgresql/data"
+  ],
+  "resources": {
+    "limits": {
+      "cpus": "0.6",
+      "memory": "1.0G"
+    },
+    "reservations": {
+      "cpus": "0.3",
+      "memory": "512MB"
+    }
+  },
+  "healthcheck": {
+    "test": ["CMD-SHELL", "pg_isready -U airflow -d airflow"],
+    "interval": "10s",
+    "timeout": "5s",
+    "retries": 3
+  },
+  "network": "parisbot-net",
+  "depends_on": []
+}

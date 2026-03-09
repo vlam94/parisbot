@@ -1,0 +1,23 @@
+[
+    {
+        "name": "database"
+    },
+    {
+        "name": "cache"
+    },
+    {
+        "name": "worker-beat"
+    },
+    {
+        "name": "worker"
+    },
+    {
+        "name": "main"
+    },
+    {
+        "name": "init"
+    },
+    {
+        "name": "cache-config"
+    }
+]  

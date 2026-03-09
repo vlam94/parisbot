@@ -1,0 +1,51 @@
+version: '3.9'
+
+services:
+  database:
+    build:
+      context: ./database/infrastructure/src/main/resources
+      dockerfile: Dockerfile
+    container_name: parisbot-database
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-parisbot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-parisbot_secure_123}
+      POSTGRES_DB: ${POSTGRES_DB:-parisbot}
+    ports:
+      - "5432:5432"
+    volumes:
+      - parisbot_db_data:/var/lib/postgresql/data
+      - ./database/infrastructure/src/main/resources/conf/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./database/infrastructure/src/main/resources/conf/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+    networks:
+      - parisbot-net
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER:-parisbot}", "-d", "${POSTGRES_DB:-parisbot}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2.0G
+        reservations:
+          cpus: '0.5'
+          memory: 1.0G
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  parisbot-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.19.0.0/16
+
+volumes:
+  parisbot_db_data:
+    driver: local

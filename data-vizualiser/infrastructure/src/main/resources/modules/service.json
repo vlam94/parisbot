@@ -1,0 +1,47 @@
+{
+  "name": "superset",
+  "version": "1.0.0",
+  "type": "visualization",
+  "engine": "superset",
+  "image": "apache/superset:3.0.0",
+  "container_name": "dataops-superset",
+  "description": "Apache Superset 6 data visualization platform",
+  "ports": {
+    "internal": 8088,
+    "external": 8088
+  },
+  "environment": {
+    "SUPERSET_LOAD_EXAMPLES": "no",
+    "SUPERSET_ENV": "production",
+    "SUPERSET_SECRET_KEY": "superset_secret_key_change_me",
+    "SUPERSET_DATABASE_URI": "postgresql://superset:superset_pass@superset-db:5432/superset",
+    "REDIS_HOST": "redis",
+    "REDIS_PORT": "6379",
+    "REDIS_DB": "0"
+  },
+  "volumes": {
+    "config": "./superset_config.py:/app/pythonpath/superset_config.py:ro",
+    "home": "/app/superset_home"
+  },
+  "resources": {
+    "cpu_limit": "1.0",
+    "memory_limit": "2G",
+    "cpu_reservation": "0.5",
+    "memory_reservation": "1G"
+  },
+  "healthcheck": {
+    "test": "curl -f http://localhost:8088/health || exit 1",
+    "interval": 30,
+    "timeout": 10,
+    "retries": 3
+  },
+  "depends_on": {
+    "superset-db": "service_healthy",
+    "redis": "service_healthy"
+  },
+  "network": {
+    "name": "dataops-net",
+    "driver": "bridge"
+  },
+  "restart_policy": "unless-stopped"
+}

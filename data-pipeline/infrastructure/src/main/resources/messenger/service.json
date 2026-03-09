@@ -1,0 +1,31 @@
+{
+  "name": "airflow-messenger",
+  "version": "7.0.0",
+  "type": "broker",
+  "engine": "redis",
+  "image": "redis:7-alpine",
+  "description": "Redis message broker for Celery task queue",
+  "ports": [6379],
+  "environment": {},
+  "volumes": [
+    "redis_data:/data"
+  ],
+  "resources": {
+    "limits": {
+      "cpus": "0.2",
+      "memory": "400MB"
+    },
+    "reservations": {
+      "cpus": "0.1",
+      "memory": "200MB"
+    }
+  },
+  "healthcheck": {
+    "test": ["CMD", "redis-cli", "ping"],
+    "interval": "10s",
+    "timeout": "5s",
+    "retries": 3
+  },
+  "network": "parisbot-net",
+  "depends_on": []
+}

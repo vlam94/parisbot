@@ -1,0 +1,32 @@
+{
+  "name": "redis-commander",
+  "version": "latest",
+  "type": "utility",
+  "engine": "redis-commander",
+  "image": "rediscommander/redis-commander:latest",
+  "description": "Redis Commander for cache inspection and debugging (optional)",
+  "ports": [8081],
+  "environment": {
+    "REDIS_HOSTS": "local:superset-cache:6380"
+  },
+  "volumes": [],
+  "resources": {
+    "limits": {
+      "cpus": "0.1",
+      "memory": "200MB"
+    },
+    "reservations": {
+      "cpus": "0.05",
+      "memory": "100MB"
+    }
+  },
+  "healthcheck": {
+    "test": ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8081 || exit 1"],
+    "interval": "10s",
+    "timeout": "5s",
+    "retries": 3
+  },
+  "network": "parisbot-net",
+  "depends_on": ["superset-cache"],
+  "optional": true
+}

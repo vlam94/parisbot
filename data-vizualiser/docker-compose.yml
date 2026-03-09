@@ -1,0 +1,210 @@
+version: '3.9'
+
+services:
+  superset-database:
+    build:
+      context: ./data-vizualiser/infrastructure/src/main/resources/database
+      dockerfile: Dockerfile
+    container_name: superset-database
+    environment:
+      POSTGRES_USER: ${SUPERSET_DB_USER}
+      POSTGRES_PASSWORD: ${SUPERSET_DB_PASSWORD}
+      POSTGRES_DB: ${SUPERSET_DB_NAME}
+    ports:
+      - "5433:5433"
+    volumes:
+      - superset_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SUPERSET_DB_USER} -d ${SUPERSET_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - parisbot-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 500M
+        reservations:
+          cpus: '0.15'
+          memory: 250M
+
+  superset-cache:
+    build:
+      context: ./data-vizualiser/infrastructure/src/main/resources/cache
+      dockerfile: Dockerfile
+    container_name: superset-cache
+    ports:
+      - "6380:6379"
+    volumes:
+      - superset_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - parisbot-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 300M
+        reservations:
+          cpus: '0.1'
+          memory: 150M
+
+  superset-worker-beat:
+    build:
+      context: ./data-vizualiser/infrastructure/src/main/resources/worker-beat
+      dockerfile: Dockerfile
+    container_name: superset-worker-beat
+    environment:
+      SUPERSET_DATABASE_URI: postgresql://${SUPERSET_DB_USER}:${SUPERSET_DB_PASSWORD}@superset-database:5433/${SUPERSET_DB_NAME}
+      REDIS_URL: redis://superset-cache:6379/0
+      FLASK_ENV: production
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+    depends_on:
+      superset-database:
+        condition: service_healthy
+      superset-cache:
+        condition: service_healthy
+    networks:
+      - parisbot-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 200M
+        reservations:
+          cpus: '0.05'
+          memory: 100M
+
+  superset-worker:
+    build:
+      context: ./data-vizualiser/infrastructure/src/main/resources/worker
+      dockerfile: Dockerfile
+    container_name: superset-worker
+    environment:
+      SUPERSET_DATABASE_URI: postgresql://${SUPERSET_DB_USER}:${SUPERSET_DB_PASSWORD}@superset-database:5433/${SUPERSET_DB_NAME}
+      REDIS_URL: redis://superset-cache:6379/0
+      FLASK_ENV: production
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+    depends_on:
+      superset-database:
+        condition: service_healthy
+      superset-cache:
+        condition: service_healthy
+    networks:
+      - parisbot-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 400M
+        reservations:
+          cpus: '0.1'
+          memory: 200M
+
+  superset-init:
+    build:
+      context: ./data-vizualiser/infrastructure/src/main/resources/init
+      dockerfile: Dockerfile
+    container_name: superset-init
+    environment:
+      SUPERSET_DATABASE_URI: postgresql://${SUPERSET_DB_USER}:${SUPERSET_DB_PASSWORD}@superset-database:5433/${SUPERSET_DB_NAME}
+      FLASK_ENV: production
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+    depends_on:
+      superset-database:
+        condition: service_healthy
+    networks:
+      - parisbot-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 300M
+        reservations:
+          cpus: '0.1'
+          memory: 150M
+
+  superset-main:
+    build:
+      context: ./data-vizualiser/infrastructure/src/main/resources/main
+      dockerfile: Dockerfile
+    container_name: superset-main
+    environment:
+      SUPERSET_DATABASE_URI: postgresql://${SUPERSET_DB_USER}:${SUPERSET_DB_PASSWORD}@superset-database:5433/${SUPERSET_DB_NAME}
+      REDIS_URL: redis://superset-cache:6379/0
+      FLASK_ENV: production
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+      SUPERSET_LOAD_EXAMPLES: 'false'
+    ports:
+      - "8088:8088"
+    volumes:
+      - superset_logs:/var/log/superset
+      - ./data-vizualiser/infrastructure/src/main/resources/superset_config.py:/app/pythonpath/superset_config.py:ro
+    depends_on:
+      superset-database:
+        condition: service_healthy
+      superset-cache:
+        condition: service_healthy
+      superset-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - parisbot-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 800M
+        reservations:
+          cpus: '0.25'
+          memory: 400M
+
+  superset-cache-config:
+    build:
+      context: ./data-vizualiser/infrastructure/src/main/resources/cache-config
+      dockerfile: Dockerfile
+    container_name: superset-cache-config
+    ports:
+      - "8081:8081"
+    environment:
+      REDIS_HOSTS: local:superset-cache:6379
+    depends_on:
+      superset-cache:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - parisbot-net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 200M
+        reservations:
+          cpus: '0.05'
+          memory: 100M
+
+volumes:
+  superset_db_data:
+  superset_redis_data:
+  superset_logs:
+
+networks:
+  parisbot-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -1,0 +1,36 @@
+{
+  "name": "database",
+  "version": "18.0.0",
+  "type": "database",
+  "engine": "postgresql",
+  "image": "postgres:18-alpine",
+  "description": "Base PostgreSQL 18 database service with optimized configuration for DataOps",
+  "ports": [5432],
+  "environment": {
+    "POSTGRES_USER": "postgres",
+    "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD}",
+    "POSTGRES_INITDB_ARGS": "-c shared_buffers=256MB -c effective_cache_size=1GB"
+  },
+  "volumes": [
+    "database_data:/var/lib/postgresql/data",
+    "./conf/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro",
+    "./conf/postgresql.conf:/etc/postgresql/postgresql.conf:ro"
+  ],
+  "resources": {
+    "limits": {
+      "cpus": "0.6",
+      "memory": "512MB"
+    },
+    "reservations": {
+      "cpus": "0.3",
+      "memory": "256MB"
+    }
+  },
+  "healthcheck": {
+    "test": ["CMD-SHELL", "pg_isready -U postgres"],
+    "interval": "10s",
+    "timeout": "5s",
+    "retries": 3
+  },
+  "network": "parisbot-net"
+}

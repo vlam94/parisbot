@@ -1,0 +1,41 @@
+{
+  "name": "superset",
+  "version": "6.0.0",
+  "type": "application",
+  "engine": "superset",
+  "image": "apache/superset:6.0-python3.11",
+  "description": "Apache Superset webserver for data visualization and exploration",
+  "ports": [8088],
+  "environment": {
+    "SUPERSET_CONFIG_PATH": "/app/pythonpath/superset_config.py",
+    "SUPERSET_DATABASE_URI": "postgresql://superset:${SUPERSET_DB_PASSWORD}@superset-database:5433/superset",
+    "REDIS_HOST": "superset-cache",
+    "REDIS_PORT": "6380",
+    "REDIS_DB": "0",
+    "FLASK_ENV": "production"
+  },
+  "volumes": [
+    "superset_logs:/var/log/superset"
+  ],
+  "resources": {
+    "limits": {
+      "cpus": "0.5",
+      "memory": "800MB"
+    },
+    "reservations": {
+      "cpus": "0.25",
+      "memory": "400MB"
+    }
+  },
+  "healthcheck": {
+    "test": ["CMD", "curl", "-f", "http://localhost:8088/health"],
+    "interval": "30s",
+    "timeout": "10s",
+    "retries": 3
+  },
+  "network": "parisbot-net",
+  "depends_on": ["superset-database", "superset-cache"],
+  "ports_mapping": {
+    "8088": "8088"
+  }
+}

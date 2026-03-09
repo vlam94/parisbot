@@ -1,0 +1,36 @@
+{
+  "name": "superset-worker",
+  "version": "5.3.0",
+  "type": "worker",
+  "engine": "celery",
+  "image": "apache/superset:6.0-python3.11",
+  "description": "Celery worker for Superset async query execution",
+  "ports": [],
+  "environment": {
+    "SUPERSET_CONFIG_PATH": "/app/pythonpath/superset_config.py",
+    "SUPERSET_DATABASE_URI": "postgresql://superset:${SUPERSET_DB_PASSWORD}@superset-database:5433/superset",
+    "REDIS_CELERY_DB": "2",
+    "REDIS_RESULTS_DB": "3"
+  },
+  "volumes": [
+    "superset_logs:/var/log/superset"
+  ],
+  "resources": {
+    "limits": {
+      "cpus": "0.2",
+      "memory": "400MB"
+    },
+    "reservations": {
+      "cpus": "0.1",
+      "memory": "200MB"
+    }
+  },
+  "healthcheck": {
+    "test": ["CMD-SHELL", "ps aux | grep 'celery.*worker' | grep -v grep || exit 1"],
+    "interval": "30s",
+    "timeout": "10s",
+    "retries": 3
+  },
+  "network": "parisbot-net",
+  "depends_on": ["superset-database", "superset-cache"]
+}

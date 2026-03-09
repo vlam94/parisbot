@@ -1,0 +1,11 @@
+# Airflow Utilities
+
+Place utility functions and helpers here.
+
+Example:
+```python
+def connect_to_database(conn_id='default'):
+    from airflow.hooks.postgres_hook import PostgresHook
+    hook = PostgresHook(postgres_conn_id=conn_id)
+    return hook.get_conn()
+```
