@@ -1,0 +1,149 @@
+name: airflow_local_development
+
+x-airflow-common: &airflow-common
+  build: 
+    context: .
+    dockerfile: Dockerfile
+  env_file:
+    - .env
+  volumes:
+    - ./src/main/python/dags:/opt/airflow/dags
+    - ./src/main/python/files:/opt/airflow/files
+    - ./src/main/python/etl:/opt/airflow/etl
+    - ./src/main/python/report:/opt/airflow/report
+    - ./src/main/python/alert:/opt/airflow/alert
+    - ./src/main/python/scripts:/opt/airflow/scripts
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on: &airflow-common-depends-on
+    airflow-messaging:
+      condition: service_healthy
+    airflow-database:
+      condition: service_healthy
+  deploy: &airflow-common-deploy
+    resources:
+      reservations:
+        cpus: "0.2"
+        memory: 400mb
+      limits:
+        cpus: "0.5"
+        memory: 900mb
+
+services:
+
+  airflow-database:
+    image: postgres:18.1-bookworm
+    container_name: airflow-database
+    hostname: airflow-database
+    ports:
+      - "15432:5432"
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    deploy:
+      <<: *airflow-common-deploy
+
+  airflow-messaging:
+    # Redis is limited to 7.2-bookworm due to licencing change
+    image: redis:7.2-bookworm
+    container_name: airflow-messaging
+    hostname: airflow-messaging
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 30s
+      retries: 50
+      start_period: 30s
+    deploy:
+      <<: *airflow-common-deploy
+
+  airflow-webserver:
+    <<: *airflow-common
+    image: airflow-webserver:3.1.8rc2-python3.11
+    container_name: airflow-webserver
+    hostname: airflow-webserver
+    command: webserver
+    ports:
+      - "18080:8080"
+    environment:
+      AIRFLOW__METRICS__STATSD_PREFIX: webserver
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      <<: *airflow-common-depends-on
+
+  airflow-scheduler:
+    <<: *airflow-common
+    image: airflow-scheduler:3.1.8rc2-python3.11
+    container_name: airflow-scheduler
+    hostname: airflow-scheduler
+    command: scheduler
+    environment:
+      AIRFLOW__METRICS__STATSD_PREFIX: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      <<: *airflow-common-depends-on
+
+  airflow-worker:
+    <<: *airflow-common
+    image: airflow-worker:3.1.8rc2-python3.11
+    container_name: airflow-worker
+    hostname: airflow-worker
+    command: celery worker -q data-warehouse
+    ports:
+      - "18793:8793"
+    environment:
+      AIRFLOW__METRICS__STATSD_PREFIX: worker
+      DUMB_INIT_SETSID: "0"
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - 'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"'
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      <<: *airflow-common-depends-on
+
+  airflow-monitoring:
+    <<: *airflow-common
+    image: airflow-monitoring:3.1.8rc2-python3.11
+    container_name: airflow-monitoring
+    hostname: airflow-monitoring
+    command: celery flower
+    ports:
+      - "5555:5555"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:5555/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      <<: *airflow-common-depends-on
+
+volumes:
+  airflow_database:
+
+networks:
+  default:
+    name: airflow-network
