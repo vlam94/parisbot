@@ -137,6 +137,44 @@ services:
     depends_on:
       <<: *airflow-common-depends-on
 
+  airflow-dag-processor:
+    image: apache/airflow:3.1.7-python3.11
+    container_name: airflow-dag-processor
+    hostname: airflow-dag-processor
+    command: dag-processor
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-database:5432/airflow
+    depends_on:
+      <<: *airflow-common-depends-on
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.1"
+          memory: 200mb
+        limits:
+          cpus: "0.3"
+          memory: 400mb
+
+  airflow-triggerer:
+    image: apache/airflow:3.1.7-python3.11
+    container_name: airflow-triggerer
+    hostname: airflow-triggerer
+    command: triggerer
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-database:5432/airflow
+    depends_on:
+      <<: *airflow-common-depends-on
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.1"
+          memory: 200mb
+        limits:
+          cpus: "0.3"
+          memory: 400mb
+
 #  airflow-init:
 #    image: apache/airflow:3.1.7-python3.11
 #    entrypoint: /bin/bash
