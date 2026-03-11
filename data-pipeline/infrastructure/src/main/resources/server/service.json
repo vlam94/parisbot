@@ -3,7 +3,7 @@
   "version": "3.1.0",
   "type": "application",
   "engine": "airflow",
-  "image": "apache/airflow:3.1-python3.11",
+  "image": "apache/airflow:3.1.8rc2-python3.11",
   "description": "Apache Airflow webserver for DAG orchestration",
   "ports": [8080],
   "environment": {

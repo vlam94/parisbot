@@ -3,7 +3,7 @@
   "version": "5.3.0",
   "type": "worker",
   "engine": "celery",
-  "image": "apache/airflow:3.1-python3.11",
+  "image": "apache/airflow:3.1.8rc2-python3.11",
   "description": "Celery worker for async Airflow task execution",
   "ports": [],
   "environment": {

@@ -1,4 +1,17 @@
-version: '3.9'
+x-airflow-common: &airflow-common
+  env_file:
+    - ../.env
+  volumes:
+    - ./pipeline/src/main/python/dags:/opt/airflow/dags
+    - ./pipeline/src/main/python/files:/opt/airflow/files
+  user: "${AIRFLOW_UID:-50000}:0"
+  networks:
+    - parisbot-net
+  depends_on: &airflow-common-depends-on
+    airflow-database:
+      condition: service_healthy
+    airflow-messenger:
+      condition: service_healthy
 
 services:
   airflow-database:
@@ -6,6 +19,9 @@ services:
       context: ./infrastructure/src/main/resources/database
       dockerfile: Dockerfile
     container_name: airflow-database
+    hostname: airflow-database
+    env_file:
+      - ../.env
     environment:
       POSTGRES_USER: ${AIRFLOW_DB_USER}
       POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD}
@@ -15,7 +31,7 @@ services:
     volumes:
       - airflow_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_DB_USER} -d ${AIRFLOW_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready", "-U", "${AIRFLOW_DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -25,7 +41,7 @@ services:
       resources:
         limits:
           cpus: '0.6'
-          memory: 1.0G
+          memory: 720M
         reservations:
           cpus: '0.3'
           memory: 512M
@@ -35,10 +51,10 @@ services:
       context: ./infrastructure/src/main/resources/messenger
       dockerfile: Dockerfile
     container_name: airflow-messenger
+    env_file:
+      - ../.env
     ports:
       - "6379:6379"
-    volumes:
-      - airflow_redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -56,6 +72,7 @@ services:
           memory: 200M
 
   airflow-scheduler:
+    <<: *airflow-common
     build:
       context: ./infrastructure/src/main/resources/scheduler
       dockerfile: Dockerfile
@@ -69,14 +86,8 @@ services:
       AIRFLOW_FERNET_KEY: ${AIRFLOW_FERNET_KEY}
     volumes:
       - airflow_logs:/opt/airflow/logs
-      - ./src/main/python/dags:/opt/airflow/dags:ro
-    depends_on:
-      airflow-database:
-        condition: service_healthy
-      airflow-messenger:
-        condition: service_healthy
-    networks:
-      - parisbot-net
+      - ./pipeline/src/main/python/dags:/opt/airflow/dags
+      - ./pipeline/src/main/python/files:/opt/airflow/files
     deploy:
       resources:
         limits:
@@ -87,6 +98,7 @@ services:
           memory: 150M
 
   airflow-worker:
+    <<: *airflow-common
     build:
       context: ./infrastructure/src/main/resources/worker
       dockerfile: Dockerfile
@@ -100,14 +112,8 @@ services:
       AIRFLOW_FERNET_KEY: ${AIRFLOW_FERNET_KEY}
     volumes:
       - airflow_logs:/opt/airflow/logs
-      - ./src/main/python/dags:/opt/airflow/dags:ro
-    depends_on:
-      airflow-database:
-        condition: service_healthy
-      airflow-messenger:
-        condition: service_healthy
-    networks:
-      - parisbot-net
+      - ./pipeline/src/main/python/dags:/opt/airflow/dags
+      - ./pipeline/src/main/python/files:/opt/airflow/files
     deploy:
       resources:
         limits:
@@ -118,6 +124,7 @@ services:
           memory: 300M
 
   airflow-webserver:
+    <<: *airflow-common
     build:
       context: ./infrastructure/src/main/resources/server
       dockerfile: Dockerfile
@@ -134,19 +141,13 @@ services:
       - "8080:8080"
     volumes:
       - airflow_logs:/opt/airflow/logs
-      - ./src/main/python/dags:/opt/airflow/dags:ro
-    depends_on:
-      airflow-database:
-        condition: service_healthy
-      airflow-messenger:
-        condition: service_healthy
+      - ./pipeline/src/main/python/dags:/opt/airflow/dags
+      - ./pipeline/src/main/python/files:/opt/airflow/files
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-    networks:
-      - parisbot-net
     deploy:
       resources:
         limits:
