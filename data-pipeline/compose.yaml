@@ -39,7 +39,7 @@ services:
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
     volumes:
-      - airflow_database:/var/lib/postgresql/airflow/data
+      - ./infrastructure/src/main/resources/database/data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 10s
@@ -188,9 +188,7 @@ services:
 #      airflow-database:
 #        condition: service_healthy
 
-volumes:
-  airflow_database:
-
 networks:
   default:
-    name: airflow-network
+    name: parisbot-net
+    external: true

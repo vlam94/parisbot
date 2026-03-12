@@ -51,6 +51,7 @@ docker-compose.override.log
 # Docker build context leftovers / compose volumes
 tmp/
 volumes/
+data/
 *.tar
 *.tar.gz
 
