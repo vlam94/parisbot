@@ -6,7 +6,7 @@ services:
       context: ./infrastructure/src/main/resources/datawarehouse/
       dockerfile: Dockerfile 
     volumes:
-      - ./infrastructure/src/main/resources/datawarehouse/data:/var/lib/postgresql/datawarehouse/data
+      - ./infrastructure/src/main/resources/datawarehouse/data:/var/lib/postgresql
     ports:
       - "5420:5420"
     hostname: db
