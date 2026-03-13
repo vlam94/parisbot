@@ -64,12 +64,16 @@ The project demonstrates:
    - Build initial dashboards for weather trends
    - Validate Redis caching
 
-4. **Deploy in Free-Tier Cloud**
+4. **Implement Project Tools**
+   - precommit
+   - poetry
+
+5. **Deploy in Free-Tier Cloud**
    - Choose a free-tier cloud 
    - Deploy Docker Compose stack
    - Test networking, scaling, and persistence
 
-5. **Implement Integrations**
+6. **Implement Integrations**
    - Add reporting via chat (Slack/Teams webhook)
    - Integrate simple ML analisys
    - Automate daily reports from Airflow
