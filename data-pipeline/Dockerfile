@@ -1,9 +1,9 @@
-FROM apache/airflow:3.1.7-python3.11
+FROM apache/airflow:3.1.8-python3.12
 
 USER airflow
 RUN pip install \
-		apache-airflow[statsd]==3.1.7\ 
-        psycopg[binary]==3.1.9\
+		apache-airflow[statsd]==3.1.8\ 
+        psycopg[binary]==3.3.3\
         requests-cache==1.3.0
 
 COPY pipeline/src/main/python /opt/airflow
