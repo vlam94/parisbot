@@ -6,7 +6,7 @@ from airflow.models import Connection
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from psycopg_pool import ConnectionPool
 import psycopg
-from utils.transformations.postgres import serialize_cell
+from tools.transformations.postgres import serialize_cell
 
 
 class PostgresPooledHook(PostgresHook):

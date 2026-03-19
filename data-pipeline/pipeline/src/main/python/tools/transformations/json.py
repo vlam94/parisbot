@@ -1,6 +1,6 @@
 import json
 import pandas as pd
-from utils.transformations.generic import isnull
+from tools.transformations.generic import isnull
 
 def check_and_load_json_obj(value: str|dict|None) -> dict|None:
     if isinstance(value, str):
