@@ -1,9 +1,8 @@
-FROM postgres:7.2-bookworm
+FROM redis:8.2-bookworm
 
 USER root
 
 COPY redis.conf /usr/local/etc/redis/redis.conf
-COPY sysctl.conf /etc/sysctl.conf
 
 RUN chown redis:redis /usr/local/etc/redis/redis.conf
 
