@@ -8,9 +8,7 @@ x-airflow-common: &airflow-common
     - .env
   volumes:
     - ./pipeline/src/main/python/dags:/opt/airflow/dags
-    - ./pipeline/src/main/python/files:/opt/airflow/files
-    - ./pipeline/src/main/python/report:/opt/airflow/report
-    - ./pipeline/src/main/python/alert:/opt/airflow/alert
+    - ./pipeline/src/main/python/tools:/opt/airflow/tools
   user: "airflow"
   depends_on: &airflow-common-depends-on
     airflow-messaging:
@@ -72,7 +70,7 @@ services:
 
   airflow-webserver:
     <<: *airflow-common
-    image: airflow-webserver:3.1.8-python3.11
+    image: airflow-webserver:3.1.8-python3.12
     container_name: airflow-webserver
     hostname: airflow-webserver
     command: api-server
@@ -89,7 +87,7 @@ services:
 
   airflow-scheduler:
     <<: *airflow-common
-    image: airflow-scheduler:3.1.8-python3.11
+    image: airflow-scheduler:3.1.8-python3.12
     container_name: airflow-scheduler
     hostname: airflow-scheduler
     command: scheduler
@@ -104,7 +102,7 @@ services:
 
   airflow-worker:
     <<: *airflow-common
-    image: airflow-worker:3.1.8-python3.11
+    image: airflow-worker:3.1.8-python3.12
     container_name: airflow-worker
     hostname: airflow-worker
     command: celery worker -q data-warehouse
@@ -123,7 +121,7 @@ services:
 
   airflow-monitoring:
     <<: *airflow-common
-    image: airflow-monitoring:3.1.8-python3.11
+    image: airflow-monitoring:3.1.8-python3.12
     container_name: airflow-monitoring
     hostname: airflow-monitoring
     command: celery flower

@@ -6,7 +6,7 @@ from airflow.models import Connection
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from psycopg_pool import ConnectionPool
 import psycopg
-from tools.transformations.postgres import serialize_cell
+from tools.transformations.postgres import get_cell_sql
 
 
 class PostgresPooledHook(PostgresHook):
@@ -71,7 +71,7 @@ class PostgresPooledHook(PostgresHook):
 
     @staticmethod
     def _format_cell(value, dtype=None, conn=None) -> str | None:
-        return serialize_cell(value, field_type=dtype, conn=conn)
+        return get_cell_sql(value, field_type=dtype, conn=conn)
 
     @classmethod
     def _compose_columns(
