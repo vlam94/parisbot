@@ -105,7 +105,7 @@ services:
     image: airflow-worker:3.1.8-python3.12
     container_name: airflow-worker
     hostname: airflow-worker
-    command: celery worker -q data-warehouse
+    command: celery worker
     ports:
       - "18793:8793"
     healthcheck:
@@ -143,7 +143,7 @@ services:
     hostname: airflow-dag-processor
     command: dag-processor
     environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutorgit 
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
     depends_on:
       <<: *airflow-common-depends-on
     deploy:
