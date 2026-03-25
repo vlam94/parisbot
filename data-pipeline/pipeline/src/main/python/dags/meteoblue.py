@@ -1,8 +1,8 @@
 import pandas as pd
 from os import environ as env
-from utils.transformations.json import unnest_json_columns
-from utils.transformations.time import localize_with_numeric_offset_hours
-from utils.operators.postgres import RequestToPostgresOperator
+from tools.transformations.json import unnest_json_columns
+from tools.transformations.time import localize_with_numeric_offset_hours
+from tools.operators.postgres import RequestToPostgresOperator
 from airflow import DAG
 
 cache_expire_seconds = 3600,  # 1h
@@ -74,7 +74,7 @@ def transform_forecast(data: pd.DataFrame, params: dict = {}) -> pd.DataFrame:
 
 with DAG(
     dag_id="meteoblue_request_to_dw",
-    schedule_interval="0 */4 * * *",
+    schedule="0 */4 * * *",
     start_date=pd.Timestamp("2020-04-16"),
     catchup=False,
     max_active_runs=1,
