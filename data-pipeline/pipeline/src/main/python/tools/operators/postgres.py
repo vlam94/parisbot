@@ -1,9 +1,10 @@
 import pandas as pd
+from airflow.models.baseoperator import BaseOperator
 from tools.connectors.postgres import PostgresPooledHook
 from tools.transformations.generic import transform_and_clean_data
 from requests_cache import CachedSession
 
-class RequestToPostgresOperator():
+class RequestToPostgresOperator(BaseOperator):
     
     def _get_request_data(self, url: str) -> pd.DataFrame:
         session = CachedSession(cache_name='.cache', expire_after=self.cache_expire_seconds)
@@ -29,6 +30,7 @@ class RequestToPostgresOperator():
         super(RequestToPostgresOperator, self).__init__(*args, **kwargs)
 
         self.url = url
+        self.cache_expire_seconds = cache_expire_seconds
         self.target_table = target_table
         self.target_columns = target_columns
         self.transform_function = transform_function
