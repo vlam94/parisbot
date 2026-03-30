@@ -1,9 +1,8 @@
 import pandas as pd
 from os import environ as env
-from tools.transformations.json import unnest_json_columns
 from tools.transformations.time import localize_with_numeric_offset_hours
 from tools.operators.postgres import RequestToPostgresOperator
-from airflow import DAG
+from airflow.sdk import DAG
 
 cache_expire_seconds = 3600,  # 1h
 
@@ -77,10 +76,10 @@ with DAG(
     schedule="0 */4 * * *",
     start_date=pd.Timestamp("2020-04-16"),
     catchup=False,
-    max_active_runs=1,
 ) as dag:    
     
     current_task = RequestToPostgresOperator(
+        task_id = "current_data",
         url = url,
         transform_function = transform_current,
         target_table = target_table_current,
@@ -89,9 +88,12 @@ with DAG(
     )
 
     forecast_task = RequestToPostgresOperator(
+        task_id = "forecast_data",
         url = url,
         transform_function = transform_forecast,
         target_table = target_table_forecast,
         target_columns = target_columns_forecast,
         cache_expire_seconds= cache_expire_seconds
     )
+
+    current_task >> forecast_task
