@@ -11,9 +11,9 @@ x-airflow-common: &airflow-common
     - ./pipeline/src/main/python/tools:/opt/airflow/tools
   user: "airflow"
   depends_on: &airflow-common-depends-on
-    airflow-messaging:
-      condition: service_healthy
     airflow-database:
+      condition: service_healthy
+    airflow-messaging:
       condition: service_healthy
   deploy: &airflow-common-deploy
     resources:
@@ -30,11 +30,9 @@ services:
     build:
       context: ./infrastructure/src/main/resources/database/
       dockerfile: Dockerfile
-    image: postgres:18.3-bookworm
     container_name: airflow-database
-    hostname: airflow-database
     ports:
-      - "15432:5432"
+      - "5432:5432"
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
@@ -54,9 +52,7 @@ services:
     build:
       context: ./infrastructure/src/main/resources/messaging/
       dockerfile: Dockerfile
-    image: redis:8.2-bookworm
     container_name: airflow-messaging
-    hostname: airflow-messaging
     ports:
       - "16379:6379"
     healthcheck:
@@ -70,7 +66,6 @@ services:
 
   airflow-webserver:
     <<: *airflow-common
-    image: airflow-webserver:3.1.8-python3.12
     container_name: airflow-webserver
     hostname: airflow-webserver
     command: api-server
@@ -82,12 +77,9 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    depends_on:
-      <<: *airflow-common-depends-on
 
   airflow-scheduler:
     <<: *airflow-common
-    image: airflow-scheduler:3.1.8-python3.12
     container_name: airflow-scheduler
     hostname: airflow-scheduler
     command: scheduler
@@ -97,55 +89,44 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    depends_on:
-      <<: *airflow-common-depends-on
 
   airflow-worker:
     <<: *airflow-common
-    image: airflow-worker:3.1.8-python3.12
     container_name: airflow-worker
     hostname: airflow-worker
     command: celery worker
-    ports:
-      - "18793:8793"
     healthcheck:
-      test:
-        - "CMD-SHELL"
-        - 'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"'
+      # yamllint disable rule:line-length
+      test: ["CMD-SHELL", 'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"']
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 30s
+    environment:
+      # Required to handle warm shutdown of the celery workers properly
+      # See https://airflow.apache.org/docs/docker-stack/entrypoint.html#signal-propagation
+      DUMB_INIT_SETSID: "0"
+    restart: always
     depends_on:
       <<: *airflow-common-depends-on
-
-  airflow-monitoring:
-    <<: *airflow-common
-    image: airflow-monitoring:3.1.8-python3.12
-    container_name: airflow-monitoring
-    hostname: airflow-monitoring
-    command: celery flower
-    ports:
-      - "5555:5555"
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:5555/"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    depends_on:
-      <<: *airflow-common-depends-on
+      airflow-webserver:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.3"
+          memory: 1g
+        limits:
+          cpus: "0.6"
+          memory: 2g
 
   airflow-dag-processor:
     <<: *airflow-common
-    image: apache/airflow:3.1.8-python3.12
     container_name: airflow-dag-processor
     hostname: airflow-dag-processor
     command: dag-processor
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-    depends_on:
-      <<: *airflow-common-depends-on
     deploy:
       resources:
         reservations:
@@ -157,14 +138,11 @@ services:
 
   airflow-triggerer:
     <<: *airflow-common
-    image: apache/airflow:3.1.8-python3.12
     container_name: airflow-triggerer
     hostname: airflow-triggerer
     command: triggerer
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-    depends_on:
-      <<: *airflow-common-depends-on
     deploy:
       resources:
         reservations:

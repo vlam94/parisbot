@@ -1,4 +1,4 @@
-FROM redis:8.2-bookworm
+FROM redis:7.2-bookworm
 
 USER root
 
