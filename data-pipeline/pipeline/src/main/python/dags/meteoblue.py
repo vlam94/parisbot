@@ -1,17 +1,18 @@
 import pandas as pd
 from os import environ as env
 from tools.transformations.time import localize_with_numeric_offset_hours
+from tools.transformations.generic import int_to_bool
 from tools.operators.postgres import RequestToPostgresOperator
 from airflow.sdk import DAG
 
-cache_expire_seconds = 3600,  # 1h
+cache_expire_seconds = 7200  # 2h
 
 target_table_current = "meteoblue.current_fact"
 target_table_forecast = "meteoblue.forecast_fact"
 
 target_columns_current = {
     "requested_at" :"timestamptz",
-    "time" : "timestampt",
+    "api_system_time" : "timestamptz",
     "isobserveddata" : "boolean",
     "metarid" : "varchar",
     "windspeed" : "numeric",
@@ -49,6 +50,15 @@ def transform_current(data: pd.DataFrame, params: dict = {}) -> pd.DataFrame:
     axis=1
     )
 
+    #converting numeric boolean (0,1) to bool (True,False)
+    data_current["isobserveddata"] = data_current["isobserveddata"].apply(int_to_bool)
+
+    data_current = data_current.rename(columns={
+        'generation_time_ms': 'response_generation_ms',
+        'time': 'api_system_time',
+    })
+
+    print('\n'.join([f"column: {col}\ndata: {data_current[col].head()}\n" for col in data_current.columns]))
     return data_current
 
 
