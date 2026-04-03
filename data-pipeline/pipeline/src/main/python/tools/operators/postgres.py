@@ -1,8 +1,9 @@
 import pandas as pd
-from airflow.models.baseoperator import BaseOperator
+from airflow.sdk.bases.operator import BaseOperator
 from tools.connectors.postgres import PostgresPooledHook
 from tools.transformations.generic import transform_and_clean_data
 from requests_cache import CachedSession
+from datetime import timedelta
 
 class RequestToPostgresOperator(BaseOperator):
     
@@ -30,7 +31,7 @@ class RequestToPostgresOperator(BaseOperator):
         super(RequestToPostgresOperator, self).__init__(*args, **kwargs)
 
         self.url = url
-        self.cache_expire_seconds = cache_expire_seconds
+        self.cache_expire_seconds = timedelta(minutes=cache_expire_seconds)
         self.target_table = target_table
         self.target_columns = target_columns
         self.transform_function = transform_function
@@ -46,7 +47,7 @@ class RequestToPostgresOperator(BaseOperator):
         data = transform_and_clean_data(
             data=data,
             transform_function=self.transform_function,
-            target_fields=self.target_columns,
+            target_fields=self.target_columns.keys(),
             clean=True,
             parameters=self.transform_parameters,
         )
@@ -62,8 +63,8 @@ class RequestToPostgresOperator(BaseOperator):
             )
         else:
             conn.insert_rows(
-                table_name=self.target_table,
-                fields=self.target_columns,
-                data=data,
+                table=self.target_table,
+                target_fields=self.target_columns,
+                rows=data.to_dict("split")["data"],
                 execute_many = True,
             )

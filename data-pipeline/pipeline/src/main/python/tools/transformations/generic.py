@@ -35,3 +35,8 @@ def transform_and_clean_data(
     logging.info("Done processing.\nTotal rows after processing: %s\nElapsed time: %s", len(data), elapsed_time)
 
     return data
+
+def int_to_bool(value):
+    if isinstance(value, int):
+        return bool(value)
+    return None

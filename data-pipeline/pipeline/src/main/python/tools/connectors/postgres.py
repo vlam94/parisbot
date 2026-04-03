@@ -59,7 +59,7 @@ class PostgresPooledHook(PostgresHook):
         else:
             with pool.connection() as conn:
                 try:
-                    conn.execute("SELECT 1")
+                    conn.execute("SELECT 'foo'")
                 except Exception:
                     PostgresPooledHook.pool_map[conn_id] = self._create_pool(conn_id)
 
