@@ -5,7 +5,11 @@ import pandas as pd
 
 
 def isnull(value):
-    return pd.isnull(value) or value == {} or value == tuple() or value == [] or value == [{}]
+    if isinstance(value,list):
+        return len(value) == 0 or value == [{}]
+    if pd.isnull(value) or value in [{},tuple(),'']:
+        return True
+    return False
 
 def transform_and_clean_data(
         data: pd.DataFrame,
