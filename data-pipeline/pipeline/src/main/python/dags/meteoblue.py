@@ -117,6 +117,7 @@ with DAG(
         transform_function = transform_current,
         target_table = target_table_current,
         target_columns = target_columns_current,
+        target_table_merge=True,
         cache_expire_seconds= cache_expire_seconds,
         retries = 5,
         retry_delay = timedelta(minutes=10)
@@ -128,6 +129,7 @@ with DAG(
         transform_function = transform_forecast,
         target_table = target_table_forecast,
         target_columns = target_columns_forecast,
+        target_table_merge=True,
         cache_expire_seconds= cache_expire_seconds,
         retries = 5,
         retry_delay = timedelta(minutes=20)
