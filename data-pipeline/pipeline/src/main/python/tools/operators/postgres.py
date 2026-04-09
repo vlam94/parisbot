@@ -54,7 +54,7 @@ class RequestToPostgresOperator(BaseOperator):
         conn = PostgresPooledHook(postgres_conn_id=self.target_postgres_conn_id)
 
         if self.target_table_merge:
-            conn.merge_rows_with_copy(
+            conn.merge_data_with_copy(
                 table_name=self.target_table,
                 fields=self.target_columns,
                 data=data.to_dict('records'),
